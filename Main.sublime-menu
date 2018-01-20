@@ -1,0 +1,20 @@
+[
+	{
+		"id" : "friday",
+		"caption" : "Friday",
+		"children": [{
+				"caption" : "Just fuck my shit up",
+				"command" : "startserver"
+			}, {
+				"caption" : "Duplicate",
+				"command" : "duplicate"
+			}, {
+				"caption" : "Replace",
+				"command" : "replace"
+			}, {
+				"caption" : "Delete Selection",
+				"command" : "deleteselection"
+			}
+		]
+	}
+]
