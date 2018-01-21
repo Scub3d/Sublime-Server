@@ -1,5 +1,8 @@
 import sublime, sublime_plugin, io, cgi, ssl, json, os
 
+from subprocess import call
+import subprocess
+
 from http.server import BaseHTTPRequestHandler
 from urllib import parse
 
@@ -36,6 +39,7 @@ class ServerHandler(BaseHTTPRequestHandler):
 		self.wfile.write(message.encode('utf-8'))
 
 	def do_POST(self):
+		message = None
 		content_length = int(self.headers['Content-Length'])
 		post_data = self.rfile.read(content_length)
 
@@ -52,12 +56,57 @@ class ServerHandler(BaseHTTPRequestHandler):
 			selectAll()
 		elif intentName == "deleteSelection":
 			deleteSelection()
-		elif intentName == "setMenuInvis":
+		elif intentName == "showMenu":
+			setMenuVisibility(True)
+		elif intentName == "hideMinimap":
+			setMinimapVisibility(False)
+		elif intentName == "showMinimap":
+			setMinimapVisibility(True)
+		elif intentName == "showSidebar":
+			setSidebarVisibility(True)
+		elif intentName == "hideSidebar":
+			setSidebarVisibility(False)
+		elif intentName == "hideTabs":
+			setTabsVisibility(False)
+		elif intentName =="createFile":
+			newFile()
+		elif intentName == "getActiveFiles":
+			message = getActiveFiles()
+		elif intentName == "getMinimapVis":
+			message = etMinimapVisibility()
+		elif intentName == "getOpenFiles":
+			message = getOpenFiles()
+			print("message == > ")
+			print(message)
+		elif intentName == "getSidebarVis":
+			message = getSidebarVisibility()
+		elif intentName == "getTabVis":
+			message = getTabsVisibility()
+		elif intentName == "gitAdd":
+			gitAdd()
+		elif intentName == "gitCommit":
+			gitCommit()
+		elif intentName == "gitPull":
+			gitPull()
+		elif intentName == "gitPush":
+			gitPush()
+		elif intentName == "hideMenu":
 			setMenuVisibility(False)
+		elif intentName == "hidePopup":
+			hidePopup()
+		elif intentName == "showTabs":
+			setTabsVisibility(True)
+		elif intentName == "replaceAll":
+			replace(json.loads(post_data.decode("utf-8"))["result"]["parameters"]["search"], json.loads(post_data.decode("utf-8"))["result"]["parameters"]["replace"])
 
 		self.send_response(200)
 		self.send_header('Content-Type', 'text/plain; charset=utf-8')
 		self.end_headers()
+
+		if message != None:
+			print(respondToGoogleHome(message))
+			self.wfile.write(respondToGoogleHome(message))#.encode('utf-8'))
+
 
 class StartserverCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
@@ -67,12 +116,12 @@ class StartserverCommand(sublime_plugin.TextCommand):
 def handleServerSetup():
 	from http.server import HTTPServer
 	server = HTTPServer(('localhost', 8080), ServerHandler)
-	# server.socket = ssl.wrap_socket(server.socket, certfile="path/to/localhost.pem", server_side=True)
 	print("Serving up spicy memes")
 	server.serve_forever()
 
 class DuplicateCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
+		gitAdd()
 		for region in self.view.sel():
 			line = self.view.line(region)
 			lineContents = '\n' + self.view.substr(line) + '\n\n'
@@ -107,7 +156,7 @@ def openFile(fileName):
 	sublime.active_window().open_file(fileName)
 
 def newFile():
-	sublime.active_window().active_view().new_file()
+	sublime.active_window().new_file()
 
 def replace(oWord, nWord):
 	global oldWord, newWord
@@ -169,10 +218,63 @@ def deleteSelection():
 	sublime.active_window().run_command("deleteselection")
 
 def getActiveFiles():
-	print("active fils")
+	activeFiles = []
+	for w in sublime.windows():
+		openFiles.append(w.active_view())
+	response = "The following files are active: "
+	for f in activeFiles:
+		response += f
+		response += ", "
+	return response[:-2]
 
-def getOpenFolders():
-	print("get open fols")
+def getOpenFiles():
+	openFiles = []
+	for w in sublime.windows():
+		for v in w.views():
+			openFiles.append(v.file_name())
 
-def respondToGoogleHome():
-	print("resposne")
+	print(openFiles)
+
+	response = "The following files are open: "
+	for f in openFiles:
+		response += f.split("\\")[-1]
+		response += ", "
+	print(response)
+	return response[:-2]
+
+def hidePopup():
+	sublime.active_window().active_view().hide_popup()
+
+def gitAdd():
+	subprocess.call(["git", "-C", "\\".join(sublime.active_window().active_view().file_name().split("\\")[:-1]), "add", sublime.active_window().active_view().file_name()])
+
+def gitCommit():
+	subprocess.call(["git", "-C", "\\".join(sublime.active_window().active_view().file_name().split("\\")[:-1]), "commit", "-m", "Made a commit from a server inside sublime text"])
+
+def gitPull():
+	subprocess.call(["git", "-C", "\\".join(sublime.active_window().active_view().file_name().split("\\")[:-1]), "pull"])
+
+def gitPush():
+	subprocess.call(["git", "-C", "\\".join(sublime.active_window().active_view().file_name().split("\\")[:-1]), "push"])
+
+
+def respondToGoogleHome(response):
+	resposneJSON = {
+	  "speech": response,
+	  "displayText": "",
+	  "data": {
+	    "google": {
+	      "expect_user_response": True,
+	      "is_ssml": True,
+	      "permissions_request": {
+	        "permissions": [
+	          "NAME",
+	          "DEVICE_COARSE_LOCATION",
+	          "DEVICE_PRECISE_LOCATION"
+	        ]
+	      }
+	    }
+	  },
+	  "contextOut": [],
+	}
+	return bytes(json.dumps(resposneJSON).encode("utf-8"))
